@@ -1,0 +1,4 @@
+name: AutoencoderKL
+target: jutils.nn.kl_autoencoder.AutoencoderKL      # first stage model (KL-Autoencoder from LDM)
+params:
+  ckpt_path: checkpoints/sd_ae.ckpt

@@ -1,0 +1,5 @@
+target: patch_flow.integrators.DualLoopSampler
+params:
+  p: 0.4
+  n_inner: 4
+  patch_size: 2

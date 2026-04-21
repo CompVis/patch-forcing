@@ -1,0 +1,5 @@
+target: patch_flow.integrators.LookAheadSampler
+params:
+  p: 0.4
+  patch_size: 2
+  context_t_ratio: 1.4

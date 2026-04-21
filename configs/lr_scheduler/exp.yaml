@@ -1,0 +1,10 @@
+# Warmup-Stable-Decay (WSD) learning rate schedule according to the paper:
+# 'MiniCPM: Unveiling the Potential of Small Language Models with Scalable Training Strategies'
+# - Hu et al. (2024)
+# Max training steps in WSD annealing phase: 3 * t_decay
+# t_decay should be ~2% of the previous training steps with constant lr
+name: exponential
+target: jutils.nn.lr_schedulers.get_exponential_decay_schedule
+params:
+  num_warmup_steps: 0
+  t_decay: 2000

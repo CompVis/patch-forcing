@@ -1,0 +1,6 @@
+name: cosine
+target: jutils.nn.lr_schedulers.get_cosine_schedule_with_warmup
+params:
+  num_warmup_steps: 1000
+  num_training_steps: 100000
+  num_cycles: 0.5

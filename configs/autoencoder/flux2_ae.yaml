@@ -1,0 +1,4 @@
+name: FLUX2AutoencoderKL
+target: jutils.nn.ae_flux2.FLUX2AutoencoderKL      # first stage model (KL-Autoencoder from FLUX.2)
+params:
+  ckpt_path: checkpoints/flux2_ae.ckpt

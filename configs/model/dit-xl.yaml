@@ -1,0 +1,10 @@
+target: patch_flow.models.dit.DiT
+params:
+  in_channels: 4
+  input_size: 32
+  depth: 28
+  hidden_size: 1152
+  patch_size: 2
+  num_heads: 16
+  num_classes: 1000
+  compile: true

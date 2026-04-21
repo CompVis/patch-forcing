@@ -1,0 +1,16 @@
+# params: 1,239,969,008
+target: patch_flow.models.pf_transformer_t2i.PatchForcingTransformerT2I
+params:
+  in_dim: 4
+  depth: 28
+  hidden_dim: 1536
+  head_dim: 96      # 16 heads
+  mapping_dim: 384
+  mapping_depth: 2
+  patch_size: 2
+  # text things
+  txt_in_dim: 2048    # must match text encoder output dim!
+  txt_refiner_dim: 1536
+  txt_refiner_head_dim: 128   # 12 heads
+  txt_refiner_depth: 2  
+  compile: false

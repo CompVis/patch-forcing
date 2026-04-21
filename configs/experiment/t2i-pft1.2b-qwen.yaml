@@ -1,0 +1,34 @@
+# @package _global_
+defaults:
+  - override /trainer: patch_flow_t2i
+  - override /data: t2i-256   # change to your data config
+  - override /model: t2i-pft-1.2b
+  - override /autoencoder: flux2_ae
+  - override /lr_scheduler: constant
+
+name: debug/t2i/coyo/qwen2b/pf-1.2b
+
+compile: true
+
+data:
+  params:
+    batch_size: 32
+    val_batch_size: 32
+    num_workers: 8
+
+model:
+  params:
+    in_dim: 32      # must match latent space dim
+    compile: ${compile}
+
+trainer:
+  params:
+    text_encoder:
+      params:
+        compile: ${compile}
+
+train_params:
+  max_steps: 400000
+  limit_val_batches: 10
+  val_check_interval: 10000
+  precision: bf16-mixed

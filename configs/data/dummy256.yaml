@@ -1,0 +1,17 @@
+name: Dummy_256
+num_classes: 1000
+target: patch_flow.dataloader.DataModuleFromConfig
+params:
+  batch_size: 16
+  num_workers: 4
+  train:
+    target: patch_flow.dataloader.DummyDataset
+    params:
+      image: [3, 256, 256]
+      label: [1]
+
+  validation:
+    target: patch_flow.dataloader.DummyDataset
+    params:
+      image: [3, 256, 256]
+      label: [1]

@@ -1,0 +1,42 @@
+# conda create -n jenv python=3.12
+# conda activate jenv
+
+# sometimes it is safer to
+# (1) install torch and torchvision manually via
+# pip install torch==2.8.0+cu128 torchvision==0.23.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+# (2) and then install flash-attn via
+# pip install flash-attn==2.8.3 --no-build-isolation
+# (3) and then the rest via
+# pip install -r requirements.txt
+
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.8.0+cu128
+--extra-index-url https://download.pytorch.org/whl/cu128
+torchvision==0.23.0+cu128
+
+
+lightning==2.5.6
+accelerate==1.10.1
+timm==1.0.17
+hydra-core
+torch-fidelity
+torchdiffeq
+notebook
+pillow
+matplotlib
+einops
+h5py
+pandas
+webdataset
+tensorboard
+wandb
+pudb
+jaxtyping
+opencv-python
+diffusers[torch]
+transformers
+
+# own util functions
+git+https://github.com/joh-schb/jutils.git#egg=jutils
+# if not working, try afterwards:
+# pip install git+https://github.com/joh-schb/jutils.git#egg=jutils

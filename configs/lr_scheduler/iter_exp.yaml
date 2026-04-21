@@ -1,0 +1,6 @@
+name: iter_exponential
+target: jutils.nn.lr_schedulers.get_iter_exponential_schedule
+params:
+  num_warmup_steps: 1000
+  num_training_steps: 100000
+  final_ratio: 0.05

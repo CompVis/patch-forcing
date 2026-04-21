@@ -1,0 +1,24 @@
+# @package _global_
+defaults:
+  - override /trainer: flow
+  - override /data: imagenet256
+  - override /model: dit-b
+  - override /autoencoder: sd_ae
+  - override /lr_scheduler: constant
+
+name: debug/imnet256/dit-b
+
+model:
+  params:
+    compile: true
+
+data:
+  params:
+    batch_size: 64
+    val_batch_size: 32
+
+train_params:
+  max_steps: 400000
+  limit_val_batches: 40
+  val_check_interval: 10000
+  precision: bf16-mixed

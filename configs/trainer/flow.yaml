@@ -1,0 +1,19 @@
+target: patch_flow.trainer.LatentFlowTrainer
+params:
+  model: ${oc.select:model, null}
+  first_stage: ${oc.select:autoencoder, null}
+  flow:
+    target: patch_flow.flow.Flow
+    params:
+      timestep_sampler: null
+
+  # learning
+  lr: 1e-4
+  weight_decay: 0.0
+  ema_rate: 0.9999
+  lr_scheduler_cfg: ${oc.select:lr_scheduler, null}
+
+  # sampling
+  sample_kwargs:
+    num_steps: 50
+    progress: False

@@ -1,0 +1,51 @@
+target: patch_flow.dataloader.WebDataModuleFromConfig
+params:
+  tar_base: ...   # TODO: add path to tar files: path/to/tars
+  batch_size: 8
+  num_workers: 8
+  val_batch_size: 16
+  val_num_workers: 1
+  multinode: True
+
+  train:
+    shards: ...   # TODO: add shards like this: 'train/{000000..999999}.tar'
+    shuffle: 100
+    image_key: jpg
+    rename:
+      image: jpg
+    dataset_transforms:
+      target: patch_flow.data_utils.TransformComposer
+      params:
+        transforms:
+          # crop-size conditioning via RoPE
+          - target: patch_flow.data_utils.ResizeCropWithMetaInfo
+            params:
+              size: 256
+              img_key: image
+              meta_key: img_meta
+          # if available, caption sampling with probs per caption type/length
+          - target: patch_flow.data_utils.CaptionSampler
+            params:
+              out_txt_key: txt
+              txt_sampling_cfg:
+                txt: 1
+                long: 2
+                medium: 3
+                short: 4
+                keywords: 2
+
+  validation:
+    shards: ...   # TODO: validation shards:'val/{000000..000100}.tar'
+    image_key: jpg
+    rename:
+      image: jpg
+      txt: medium  # use medium caption for val
+    image_transforms:
+      - target: torchvision.transforms.Resize
+        params:
+          size: 256
+          interpolation: 2
+          antialias: True
+      - target: torchvision.transforms.CenterCrop
+        params:
+          size: 256

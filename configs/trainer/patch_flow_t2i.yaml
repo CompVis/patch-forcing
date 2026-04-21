@@ -1,0 +1,38 @@
+target: patch_flow.trainer_t2i.PatchForcingT2ITrainer
+
+params:
+  model: ${oc.select:model, null}
+  first_stage: ${oc.select:autoencoder, null}
+  
+  # patch flow forcing
+  flow:
+    target: patch_flow.flow_pf.PatchFlowForcing
+    params:
+      patch_size: 2
+      timestep_sampler:
+        target: patch_flow.timestep_schedules.LogitNormalTruncatedGaussian
+        params:
+          std: 0.6
+          loc: 0.5
+          scale: 1.0
+
+  # text conditioning
+  text_encoder:
+    target: patch_flow.text_encoder.Qwen3VLEmbedder2B
+    params:
+      compile: true
+  text_dropout_prob: 0.1
+  text_key: txt
+  
+  # learning
+  lr: 1e-4
+  weight_decay: 0.0
+  ema_rate: 0.9999
+  lr_scheduler_cfg: ${oc.select:lr_scheduler, null}
+  rope_jittering: true
+  uncertainty_weight: 0.01
+
+  # sampling
+  sample_kwargs:
+    num_steps: 50
+    progress: False

@@ -1,0 +1,93 @@
+defaults:
+  - _self_
+  - model: dit-b
+  - data: dummy256    # dummy data
+  - autoencoder: tiny_ae
+  - lr_scheduler: null
+  - trainer: flow
+  - experiment: null    # must be last in defaults list as it can override all others
+
+  # disable hydra logging
+  - override hydra/hydra_logging: disabled
+  - override hydra/job_logging: disabled
+  
+# ----------------------------------------
+name: debug/your_exp
+
+# ----------------------------------------
+# logging
+use_wandb: False
+use_wandb_offline: False
+wandb_project: patch-forcing
+
+tags: []
+
+# checkpoint loading
+load_weights: null
+load_strict: True
+# resume_step: 0    # can be used for load_weights to specify step (not required for resume_checkpoint)
+resume_checkpoint: null
+
+# checkpoint saving (lightning callback)
+checkpoint_params:              # filename refers to number of gradient updates
+    every_n_train_steps: 10000  # gradient update steps
+    save_top_k: -1              # needs to be -1, otherwise it overwrites
+    verbose: True
+    save_last: True
+    auto_insert_metric_name: False
+
+# ----------------------------------------
+train_params:
+  max_steps: -1
+  max_epochs: -1
+  num_sanity_val_steps: 0
+  accumulate_grad_batches: 1
+  log_every_n_steps: 1        # gradient update steps
+  limit_val_batches: 8        # per GPU
+  val_check_interval: 5000    # steps, regardless of gradient accumulation
+  precision: bf16-mixed
+  clip_grad_norm: 1.0
+
+callbacks:
+  - target: lightning.pytorch.callbacks.LearningRateMonitor
+    params:
+      logging_interval: 'step'
+
+# ----------------------------------------
+# profiling
+profile: false
+profiling:
+  warmup: 40
+  active: 1
+  filename: profile.json
+  cpu: true
+  cuda: true
+  record_shapes: false
+  profile_memory: false
+  with_flops: false
+
+# ----------------------------------------
+# distributed
+num_nodes: 1
+devices: -1
+auto_requeue: False
+tqdm_refresh_rate: 1        # set higher on slurm (otherwise prints tqdm every step)
+deepspeed_stage: 0
+p2p_disable: False
+slurm_id: null
+cuda_prefetch: False
+cuda_prefetch_factor: 2
+ddp_kwargs:
+  find_unused_parameters: False   # default: False
+  gradient_as_bucket_view: True   # default: False
+  bucket_cap_mb: 100              # default: 25
+  broadcast_buffers: True         # default: True
+
+# ----------------------------------------
+user: ${oc.env:USER}
+
+# don't log and save files
+hydra:
+  output_subdir: null
+  run:
+    dir: .

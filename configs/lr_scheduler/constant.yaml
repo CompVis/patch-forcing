@@ -1,0 +1,4 @@
+name: constant
+target: jutils.nn.lr_schedulers.get_constant_schedule_with_warmup
+params:
+  num_warmup_steps: 1000

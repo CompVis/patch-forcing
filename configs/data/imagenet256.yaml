@@ -1,0 +1,44 @@
+name: ImageNet_256px
+num_classes: 1000
+target: patch_flow.dataloader.WebDataModuleFromConfig
+params:
+  tar_base: ...   # TODO: add path to tar files: path/to/tars
+  batch_size: 32
+  num_workers: 4
+  val_num_workers: 1
+  multinode: True
+  train:
+    shards: ...   # TODO: add shards like this: 'train/{000000..999999}.tar'
+    shuffle: 100
+    image_key: jpeg
+    rename:
+      image: jpeg
+      label: cls
+    image_transforms:
+      - target: torchvision.transforms.RandomHorizontalFlip
+        params:
+          p: 0.5
+      - target: torchvision.transforms.Resize
+        params:
+          size: 256
+          interpolation: 2
+          antialias: True
+      - target: torchvision.transforms.CenterCrop
+        params:
+          size: 256
+
+  validation:
+    shards: ...   # TODO: validation shards:'val/{000000..000100}.tar'
+    image_key: jpeg
+    rename:
+      image: jpeg
+      label: cls
+    image_transforms:
+      - target: torchvision.transforms.Resize
+        params:
+          size: 256
+          interpolation: 2
+          antialias: True
+      - target: torchvision.transforms.CenterCrop
+        params:
+          size: 256
