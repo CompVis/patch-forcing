@@ -100,7 +100,7 @@ Please refer to our paper for a more detailed description of our framework. 😉
 
 # 🛠️ Code Setup
 
-This codebase is based on Python `3.12` and the packages listed in [requirements.txt](/export/home/ru59wap/projects/patch-forcing/requirements.txt).
+This codebase is based on Python `3.12` and the packages listed in `requirements.txt`.
 
 First, clone the repository:
 
