@@ -15,8 +15,8 @@
 <div align="center">
 
 
-[![Website](https://img.shields.io/badge/Project-Page-lightgrey)]()
-[![Paper](https://img.shields.io/badge/arXiv-PDF-b31b1b)](https://github.com/CompVis/patch-forcing)
+[![Website](https://img.shields.io/badge/Project-Page-lightgrey)](https://github.com/CompVis/patch-forcing)
+[![Paper](https://img.shields.io/badge/arXiv-PDF-b31b1b)](https://arxiv.org/abs/2604.19141)
 
 <p align="center"> <sup>*</sup> <i>equal contribution</i> </p>
 
@@ -189,7 +189,7 @@ You can use `scripts/t2i_sample.py` to sample images based on a text prompt.
 If you use our work in your research, please use the following BibTeX entry. 🙂
 
 ```bibtex
-@InProceedings{schusterbauer2025patchforcing,
+@InProceedings{schusterbauer2026patchforcing,
       title={Denoising, Fast and Slow: Difficulty-Aware Adaptive Sampling for Image Generation},
       author={Johannes Schusterbauer and Ming Gui and Yusong Li and Pingchuan Ma and Felix Krause and Björn Ommer},
       booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
