@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Patch Forcing | Denoising, Fast and Slow</title>
+  <meta name="description"
+    content="Project page for Patch Forcing: difficulty-aware adaptive sampling for image generation.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Source+Sans+3:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css">
+</head>
+
+<body>
+  <main class="page">
+    <header class="hero" id="top">
+      <p class="venue">CVPR 2026</p>
+      <h1>Denoising, Fast and Slow: Difficulty-Aware Adaptive Sampling for Image Generation</h1>
+      <p class="authors">
+        <a href="https://johfischer.com/" target="_blank" rel="noreferrer">Johannes Schusterbauer</a>* ·
+        <a href="https://scholar.google.com/citations?user=Uiv6gU8AAAAJ&amp;hl=en" target="_blank" rel="noreferrer">Ming
+          Gui</a>* ·
+        Yusong Li · Pingchuan Ma · Felix Krause ·
+        <a href="https://ommer-lab.com/" target="_blank" rel="noreferrer">Björn Ommer</a>
+      </p>
+      <p class="affiliation">CompVis @ LMU Munich · Munich Center for Machine Learning (MCML)</p>
+      <p class="author-note">* equal contribution</p>
+
+      <div class="links">
+        <a href="https://arxiv.org/pdf/2604.19141" target="_blank" rel="noreferrer">Paper</a>
+        <a href="https://arxiv.org/abs/2604.19141" target="_blank" rel="noreferrer">arXiv</a>
+        <a href="https://github.com/CompVis/patch-forcing" target="_blank" rel="noreferrer">Code</a>
+      </div>
+    </header>
+
+    <section class="section" id="TL;DR">
+      <h2>🚀 TL;DR</h2>
+      <p class="lead">
+        <strong>Patch Forcing turns denoising into a spatially adaptive process.</strong>
+        We introduce patch-wise diffusion timesteps during training, where different image patches have different noise
+        scales.
+        Although conceptually simple, the approach is not trivial: naive uniform timestep sampling deteriorates
+        performance. Thus, we require a dedicated timestep sampler to regulate the amount of clean information exposed
+        during training, mitigating the train-test gap where inference operates purely from noise without access to
+        clean signals.
+        Building on this, we introduce adaptive sampling strategies, where easy regions are denoised faster and provide
+        cleaner context for
+        harder ones, improving generation quality.
+      </p>
+      <div class="contrib-row" aria-label="Main contributions">
+        <article class="contrib-box">
+          <h4>Patch-wise timesteps</h4>
+          <p>enable heterogeneous denoising.</p>
+        </article>
+        <article class="contrib-box">
+          <h4>LTG timestep sampler</h4>
+          <p>reduces the train-test gap.</p>
+        </article>
+        <article class="contrib-box">
+          <h4>Patch difficulty-aware sampling</h4>
+          <p>allocates compute dynamically.</p>
+        </article>
+      </div>
+      <figure class="figure-medium">
+        <img src="assets/figures/teaser.png" alt="Patch Forcing overview figure showing training and inference">
+        <figcaption><strong>Figure 1.</strong> Patch-wise timesteps during training enable adaptive inference at test
+          time.
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="section" id="motivation">
+      <h2>🤔 Motivation</h2>
+      <p>
+        Most diffusion and flow-based image generators allocate compute uniformly across space, using a single global
+        timestep for all image regions.
+        While convenient, this assumes that all regions are equally difficult to denoise.
+        In practice, images are highly heterogeneous. Large, low-frequency regions such as backgrounds are easy
+        to denoise, whereas thin structures, object boundaries, or text remain ambiguous until late
+        in the denoising process. Treating all regions the same therefore wastes compute on easy areas while
+        under-refining regions that would benefit from either more steps or additional context.
+      </p>
+
+      <p>
+        This suggests a simple question: can the denoising process itself adapt to the spatial structure of the image?
+        Concretely, can we let different regions follow different noise trajectories, so that easy regions move ahead
+        and provide cleaner context for harder regions?
+      </p>
+
+      <figure class="figure-wide">
+
+        <img src="assets/figures/inference-overview.png" alt="Inference overview for adaptive sampling">
+
+        <figcaption><strong>Figure 2.</strong> Easy regions move ahead in time and provide context for harder regions.
+        </figcaption>
+
+      </figure>
+    </section>
+
+    <section class="section" id="method">
+      <h2>🗺️ Method</h2>
+      <p>
+        Patch Forcing consists of two parts. First, we train the model with heterogeneous patch-wise timesteps,
+        but use a dedicated timestep sampler to avoid overly informative training states. Second, we equip the model
+        with a lightweight patch-difficulty head, which enables adaptive samplers that let easy regions
+        move ahead and guide harder ones.
+      </p>
+      <figure class="figure-video-small">
+        <video autoplay controls muted loop playsinline poster="assets/posters/training-poster.jpg">
+          <source src="assets/videos/training.mp4" type="video/mp4">
+        </video>
+        <figcaption>Training with heterogeneous per-patch timesteps.</figcaption>
+      </figure>
+
+      <h3>Timestep Sampling during Training</h3>
+      <p>
+        A natural starting point is to apply Diffusion Forcing
+        (<a href="https://arxiv.org/abs/2407.01392" target="_blank" rel="noreferrer">Chen et al., 2024</a>) at the patch
+        level and sample timesteps independently per patch.
+        While this works well for sequential data such as videos, it leads to overly informative training states in
+        images: most samples contain at least some nearly clean patches, introducing a mismatch to inference, which
+        starts from
+        pure noise.
+        For example, using flow-matching settings, independently sampling each patch timesteps uniformly in [0,1]
+        concentrates the mean sample noise level across patches around intermediate values. This sharply contrasts with
+        inference, which starts from a mean near 0 (pure noise) and gradually progresses toward 1 (clean signal).
+      </p>
+      <p>
+        Prior work (SRM, <a href="https://arxiv.org/abs/2502.21075" target="_blank" rel="noreferrer">Wewer et al.,
+          2025</a>)
+        addresses this issue by controlling the <em>average</em> information per sample. This is well-suited for spatial
+        reasoning tasks
+        such as Sudoku, where partial solutions naturally provide valid context. In image generation, however, inference
+        starts
+        from pure noise, and such clean context is not available. As a result, controlling only the mean still leaves a
+        mismatch,
+        since the most informative patch often remains close to fully denoised.
+
+      </p>
+
+      <figure class="figure-wide">
+        <img src="assets/figures/srm-comparison.png" alt="SRM comparison figure">
+        <figcaption><strong>Figure 3.</strong> Controlling maximum information better matches inference than
+          controlling only the mean.</figcaption>
+      </figure>
+      <p>
+
+        To resolve this mismatch, we directly control the <em>maximum</em> information per sample. Concretely, we sample
+        a
+        maximum timestep from a shifted Logit-Normal distribution (<a href="https://arxiv.org/abs/2403.03206"
+          target="_blank" rel="noreferrer">Esser et al.,
+          2024</a>) and then draw all patch timesteps from the lower half
+        of
+        a truncated Gaussian centered at this value (Fig. 4). This Logit-Normal Truncated Gaussian (LTG) sampler
+        prevents
+
+        overly clean patches, while maintaining a broad coverage of noise levels across patches.
+
+      </p>
+      <figure class="figure-compact">
+        <img src="assets/figures/ltg-sampler.png" alt="LTG timestep sampler overview">
+        <figcaption><strong>Figure 4.</strong> LTG sampler overview.</figcaption>
+      </figure>
+
+      <h3>Training with Heterogeneous Timesteps</h3>
+      <p>
+
+        Patch Forcing requires only minimal changes to a standard SiT/DiT-style architecture (<a
+          href="https://arxiv.org/abs/2212.09748" target="_blank" rel="noreferrer">Peebles & Xie,
+          2023</a>; <a href="https://arxiv.org/abs/2401.08740" target="_blank" rel="noreferrer">Ma et al.,
+          2024</a>).
+        In existing models, conditioning signals such as the timestep are embedded once and injected via adaptive
+        LayerNorm (AdaLN), effectively broadcasting the same conditioning across all tokens. We instead replace
+        this global conditioning with patch-wise conditioning by providing one timestep embedding per token/patch.
+        The class embedding is similarly repeated across patches, and the AdaLN modulation is applied token-wise,
+        allowing each patch to follow its own denoising trajectory.
+      </p>
+
+      <p>
+        We additionally add one output channel for predicted patch difficulty, parameterized as a log-variance.
+        The model therefore predicts both the denoising velocity and a spatial uncertainty map, while leaving the
+        transformer backbone unchanged.
+      </p>
+      <details class="code-toggle">
+
+        <summary>Minimal code changes for Patch Forcing</summary>
+
+        <pre class="code-diff"><code class="language-diff">@@ -10,6 +10,7 @@
+
+ import torch
+
+ import torch.nn as nn
+
++from einops import repeat
+
+ def modulate(x, shift, scale):
+
+-    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
+
++    return x * (1 + scale) + shift
+
+@@ -113,9 +111,9 @@ class SiTBlock(nn.Module):
+
+-    shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=1)
+
+-    x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa))
+
+-    x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
+
++    shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=-1)
+
++    x = x + gate_msa * self.attn(modulate(self.norm1(x), shift_msa, scale_msa))
+
++    x = x + gate_mlp * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
+
+@@ -227,14 +225,22 @@ class SiT(nn.Module):
+
+-  def forward(self, x, t, y):
+
++  def forward(self, x, t, y, return_uncertainty: bool = True):
+
+     x = self.x_embedder(x) + self.pos_embed
+
+-    t = self.t_embedder(t)                   # (N, D)
+
+-    y = self.y_embedder(y, self.training)    # (N, D)
+
++    t = t[..., None]                         # (b, n) -> (b, n, 1)
+
++    t = self.t_embedder(t).squeeze(1)         # (b, n, d)
+
++
+
++    y = self.y_embedder(y, self.training)     # (b, d)
+
++    y = repeat(y, 'b d -> b n d', n=x.shape[1])
+
+     c = t + y
+
+     for block in self.blocks:
+
+       x = block(x, c)
+
+     x = self.final_layer(x, c)
+
+     x = self.unpatchify(x)
+
+-    return x
+
++    logvar_theta = x[:, -1:, :, :]
+
++    x = x[:, :-1, :, :]
+
++    return x, logvar_theta</code></pre>
+
+      </details>
+
+      <h3>Patch Difficulty Prediction</h3>
+      <p>
+        To enable adaptive sampling, the model must estimate which regions are easy or difficult to denoise.
+        We follow uncertainty-prediction ideas from prior diffusion literature
+
+        (<a href="https://arxiv.org/abs/2102.09672" target="_blank" rel="noreferrer">Nichol and Dhariwal, 2021</a>;
+
+        <a href="https://arxiv.org/abs/2502.21075" target="_blank" rel="noreferrer">Wewer et al., 2025</a>)
+
+        and augment the model with a lightweight per-patch uncertainty head.
+      </p>
+
+      <p>
+
+        Concretely, the model predicts (i) a mean (velocity) for denoising and (ii) a per-patch log-variance.
+
+        Both are trained jointly using a Gaussian negative log-likelihood objective:
+
+      </p>
+
+      <p class="equation-block">
+        L<sub>total</sub> = E[ ||v<sub>GT</sub> - v<sub>&theta;</sub>||<sup>2</sup> - &lambda; log N(v<sub>GT</sub> |
+        sg(v<sub>&theta;</sub>), &sigma;<sub>&theta;</sub><sup>2</sup>I) ].
+      </p>
+
+      <p>
+        Intuitively, this objective introduces two coupled roles: the model fits the mean prediction while also
+        calibrating its confidence. Regions with large prediction errors are encouraged to produce higher variance,
+        whereas easy regions are pushed toward low uncertainty.
+      </p>
+
+      <p>
+        Figure 5 illustrates this behavior on a simple 2D example. The model assigns low uncertainty to confident
+        trajectories and higher uncertainty to ambiguous ones, effectively capturing local prediction difficulty.
+        We use this predicted variance as a proxy for patch-wise denoising difficulty during adaptive sampling.
+      </p>
+      <figure class="figure-compact">
+        <img src="assets/figures/nll.png" alt="Gaussian NLL intuition figure">
+        <figcaption><strong>Figure 5.</strong> NLL intuition in 2D: uncertainty adapts to local prediction error.
+        </figcaption>
+      </figure>
+
+      <h3>Adaptive Sampling Development</h3>
+      <p>
+        Combining patch-wise timesteps with per-patch difficulty prediction enables adaptive sampling.
+        Instead of following a single global schedule, the model can allocate compute spatially based on
+        predicted uncertainty.
+      </p>
+      <p>
+        The core intuition is simple: let easy regions move ahead and use them as context for harder ones.
+        This allows the model to focus computation where it is most needed, while avoiding unnecessary updates
+        in regions that are already resolved.
+      </p>
+      <p>
+
+        We base our sampling strategies on three key empirical findings:
+
+      </p>
+      <div class="findings-grid">
+
+        <article class="finding-item">
+
+          <h4>1. Context Helps Generation</h4>
+
+          <p>Advancing confident patches provides cleaner context, improving predictions in more challenging regions.
+          </p>
+
+          <img src="assets/figures/context-helps.png" alt="Context helps generation plot">
+
+        </article>
+
+        <article class="finding-item">
+
+          <h4>2. Uncertainty Tracks Patch Difficulty</h4>
+
+          <p>Predicted uncertainty correlates with reconstruction error and identifies regions that require more
+            refinement.</p>
+
+          <img src="assets/figures/uncertainty-overview.png" alt="Uncertainty overview plot">
+
+        </article>
+
+        <article class="finding-item">
+
+          <h4>3. Context Reduces Uncertainty</h4>
+
+          <p>Providing additional context lowers uncertainty in ambiguous regions, making them easier to resolve.</p>
+
+          <img src="assets/figures/context-reduces-uncertainty.png" alt="Context reduces uncertainty plot">
+
+        </article>
+
+      </div>
+
+      <h4>Adaptive Samplers</h4>
+
+      <p>
+
+        Based on these findings, we design adaptive sampling strategies that dynamically advance confident regions
+
+        and allocate more refinement steps to uncertain ones.
+
+      </p>
+
+      <div class="sampler-boxes">
+
+        <article class="sampler-box">
+
+          <h5>Dual-loop</h5>
+
+          <p>Alternates between advancing confident patches with larger steps and refining uncertain patches with
+            smaller steps.</p>
+
+        </article>
+
+        <article class="sampler-box">
+
+          <h5>Look-ahead</h5>
+
+          <p>Propagates confident patches to future timesteps and uses them as context for denoising uncertain regions.
+          </p>
+
+        </article>
+
+      </div>
+
+      <figure class="figure-video-half">
+
+        <video autoplay controls muted loop playsinline poster="assets/posters/sampling-poster.jpg">
+
+          <source src="assets/videos/sampling.mp4" type="video/mp4">
+
+        </video>
+
+        <figcaption>Adaptive sampling in action.</figcaption>
+
+      </figure>
+
+    </section>
+
+    <section class="section" id="results">
+      <h2>📈 Results</h2>
+
+      <h3>Class-Conditional</h3>
+      <p>
+
+        On ImageNet-256, training with heterogeneous patch-wise timesteps already improves generation quality under
+
+        fully matched architectures, training, and compute. Even with standard parallel Euler sampling at inference,
+
+        Patch Forcing outperforms the SiT baseline, indicating that heterogeneous timesteps contribute significantly
+
+        to the observed gains. Figure 6 further shows that randomly selecting patches for updates performs worse than
+
+        simple parallel sampling, while uncertainty-guided schedules consistently improve performance. This suggests
+
+        that the predicted log-variance provides a meaningful signal for patch difficulty.
+      </p>
+      <figure class="figure-wide">
+        <img src="assets/figures/schedule-performance.png" alt="Schedule performance comparison">
+        <figcaption><strong>Figure 6.</strong> Adaptive schedules outperform random ordering under fixed compute.
+        </figcaption>
+      </figure>
+      <p>
+
+        These improvements persist across model scales, from B/2 to XL/2, suggesting that the benefits of
+
+        heterogeneous timesteps generalize beyond a specific model capacity.
+
+      </p>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Model Size</th>
+            <th>Params</th>
+            <th>SiT</th>
+            <th>PFT - Euler</th>
+            <th>PFT - Dual-loop</th>
+            <th>PFT - Look-ahead</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>B/2</td>
+            <td>130M</td>
+            <td>33.0</td>
+            <td>27.9 <span class="improve">(-15.5%)</span></td>
+            <td>26.0 <span class="improve">(-21.2%)</span></td>
+            <td>24.2 <span class="improve">(-26.7%)</span></td>
+          </tr>
+          <tr>
+            <td>L/2</td>
+            <td>458M</td>
+            <td>18.8</td>
+            <td>14.7 <span class="improve">(-21.8%)</span></td>
+            <td>13.9 <span class="improve">(-26.1%)</span></td>
+            <td>13.0 <span class="improve">(-30.9%)</span></td>
+          </tr>
+          <tr>
+            <td>XL/2</td>
+            <td>675M</td>
+            <td>17.2</td>
+            <td>12.9 <span class="improve">(-25.0%)</span></td>
+            <td>11.5 <span class="improve">(-33.1%)</span></td>
+            <td>9.8 <span class="improve">(-43.0%)</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Text-to-Image</h3>
+      <p>
+        Patch Forcing also scales to text-conditioned generation and remains competitive on T2I-CompBench++ and
+        GenEval.
+      </p>
+      <figure class="figure-medium">
+        <div class="gallery">
+          <img src="assets/t2i/macaron.jpg" alt="Text-to-image example of colorful macarons">
+          <img src="assets/t2i/still-tired.jpg" alt="Text-to-image example of a sleepy scene">
+          <img src="assets/t2i/penguins.jpg" alt="Text-to-image example of penguins">
+          <img src="assets/t2i/train.jpg" alt="Text-to-image example of a train">
+          <img src="assets/t2i/parrot.jpg" alt="Text-to-image example of a parrot">
+          <img src="assets/t2i/cathedral.jpg" alt="Text-to-image example of a cathedral">
+        </div>
+        <figcaption><strong>Figure 7.</strong> Qualitative text-to-image examples.</figcaption>
+      </figure>
+
+      <p>
+
+        We further find improved text rendering capabilities when training with heterogeneous patch-wise timesteps
+        under matched
+        training and inference settings compared to standard Flow Matching models. This aligns with concurrent
+        observations in Self-Flow
+        (<a href="https://arxiv.org/abs/2603.06507" target="_blank" rel="noreferrer">Chefer et al., 2026</a>),
+        which also leverage heterogeneous timesteps. While Self-Flow mitigates the train-test gap using
+        dual-timestep training together with an additional representation learning objective, our results
+        suggest that improved text rendering already arises from heterogeneous timesteps alone, potentially
+        reducing the need for additional forward passes. However, what exactly drives this improvement remains an
+        open question, interesting for future work. 😉
+      </p>
+
+      <figure class="text-rendering-table figure-wide">
+        <p class="tr-model">Flow Matching</p>
+        <div class="tr-image-row">
+          <img src="assets/text-rendering/graffiti-cvpr_base.png" alt="Flow Matching baseline graffiti text rendering">
+          <img src="assets/text-rendering/neon-sign_base.png" alt="Flow Matching baseline neon sign text rendering">
+          <img src="assets/text-rendering/cake2_base.png" alt="Flow Matching baseline cake text rendering">
+        </div>
+        <p class="tr-model">Patch Forcing</p>
+        <div class="tr-image-row">
+          <img src="assets/text-rendering/graffiti-cvpr_pft.png" alt="Patch Forcing graffiti text rendering">
+          <img src="assets/text-rendering/neon-sign_pft.png" alt="Patch Forcing neon sign text rendering">
+          <img src="assets/text-rendering/cake2_pft.png" alt="Patch Forcing cake text rendering">
+        </div>
+        <div class="tr-prompts">
+          <p>Graffiti on a brick wall spelling "CVPR 2026" in colorful font.</p>
+          <p>A neon sign over a bar that reads "Patch-Forcing 24/7" with blue font.</p>
+          <p>A birthday cake with icing that spells "Paulina" in pink font.</p>
+        </div>
+        <figcaption><strong>Figure 8.</strong> Text rendering comparison.</figcaption>
+      </figure>
+    </section>
+
+    <section class="section" id="citation">
+      <h2>🎓 Citation</h2>
+      <p>If you find this research interesting and useful for your own work, we are happy if you cite us.</p>
+      <pre><code class="language-bibtex">@InProceedings{schusterbauer2026patchforcing,
+  title={Denoising, Fast and Slow: Difficulty-Aware Adaptive Sampling for Image Generation},
+  author={Johannes Schusterbauer and Ming Gui and Yusong Li and Pingchuan Ma and Felix Krause and Björn Ommer},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  year={2026}
+}</code></pre>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-diff.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bibtex.min.js"></script>
+</body>
+
+</html>

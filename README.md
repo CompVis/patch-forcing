@@ -15,7 +15,7 @@
 <div align="center">
 
 
-[![Website](https://img.shields.io/badge/Project-Page-lightgrey)](https://github.com/CompVis/patch-forcing)
+[![Website](https://img.shields.io/badge/Project-Page-lightgrey)](https://compvis.github.io/patch-forcing)
 [![Paper](https://img.shields.io/badge/arXiv-PDF-b31b1b)](https://arxiv.org/abs/2604.19141)
 
 <p align="center"> <sup>*</sup> <i>equal contribution</i> </p>
@@ -24,7 +24,7 @@
 
 
 <p align="center">
-<img src="assets/fpf.png" alt="Patch Forcing overview" width="60%">
+<img src="assets/fpf.png" alt="Patch Forcing overview" width="500px">
 </p>
 
 # 🚀 TL;DR
@@ -73,7 +73,7 @@ With this simple change, heterogeneous patch-wise denoising works! Even without 
 To fully leverage patch-wise denoising at inference, we need to decide **which regions should be denoised faster** and **which require more refinement**. For this, we augment the model with a lightweight uncertainty (difficulty) head that predicts, for each patch, how reliable the current denoising velocity prediction is.
 
 <p align="center">
-<img src="assets/uncertainty.png" alt="Uncertainty" width="40%">
+<img src="assets/uncertainty.png" alt="Uncertainty" width="400px">
 </p>
 
 With heterogeneous denoising and the uncertainty head, we base our adaptive samplers on three key findings:
@@ -119,7 +119,7 @@ pip install -r requirements.txt
 
 If the default install fails on your machine, follow the safer install order noted in ?`requirements.txt`: install `torch` and `torchvision` first, then `flash-attn`, then the remaining requirements.
 
-We release two Patch Forcing checkpoints: [PFT-B](https://ommer-lab.com/files/pft/pft-b_step400k_ema.ckpt) and [PFT-XL](https://ommer-lab.com/files/pft/pft-xl_step400k_ema.ckpt). The checkpoints contain the EMA weights, as well as the model config.
+We release two [Patch Forcing Transformer](https://ommer-lab.com/files/pft/) checkpoints: [PFT-B](https://ommer-lab.com/files/pft/pft-b_step400k_ema.ckpt) and [PFT-XL](https://ommer-lab.com/files/pft/pft-xl_step400k_ema.ckpt). The checkpoints contain the EMA weights, as well as the model config.
 
 ### Class-Conditional Generation
 
